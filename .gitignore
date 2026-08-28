@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# Android / Gradle
+.gradle/
+.kotlin/
+build/
+local.properties
+*.apk
+*.aab
+.idea/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
