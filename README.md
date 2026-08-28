@@ -261,6 +261,14 @@ KapeVPN-PIA/          # fuses the three modules above (plus the AmneziaWG native
 
 ---
 
+## Contributing
+
+By contributing to this project you are agreeing to the terms stated in the Contributor License Agreement (CLA) [here](/CLA.rst).
+
+For more details please see [CONTRIBUTING](/CONTRIBUTING.md).
+
+Issues and Pull Requests should use these templates: [ISSUE](/.github/ISSUE_TEMPLATE.md) and [PULL REQUEST](/.github/PULL_REQUEST_TEMPLATE.md).
+
 ## License
 
-The published artifact is distributed under the [MIT License](https://opensource.org/licenses/MIT).
+This project is licensed under the [MIT (Expat) license](https://choosealicense.com/licenses/mit/), which can be found [here](/LICENSE).
