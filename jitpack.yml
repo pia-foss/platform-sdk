@@ -1,0 +1,7 @@
+# JitPack build config for the KapeVPN-PIA public mirror.
+# The buildable Gradle project lives in android/ (not the repo root), mirroring the layout of
+# kp_platform_sdks itself (top-level VERSION file + android/ Gradle root) so kape.publish.fused's
+# version resolution (rootProject.rootDir.parentFile.resolve("VERSION")) works unchanged.
+jdk: openjdk21
+install:
+  - cd android && ./gradlew :KapePlatformSDK:KapeVPN-PIA:publishReleasePublicationToMavenLocal
