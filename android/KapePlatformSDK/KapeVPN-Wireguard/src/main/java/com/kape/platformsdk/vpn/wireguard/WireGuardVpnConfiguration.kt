@@ -95,6 +95,11 @@ data class WireGuardAuthConfiguration(
     val internalIp: String,
     val dnsServers: List<String> = emptyList(),
     val gatewayIp: IpAddress? = null,
+    // Null means the authenticator has no opinion — the pre-authentication configuration's own
+    // obfuscation setting is kept. Lets an authenticator that learns real obfuscation parameters
+    // as part of authenticating (e.g. AmneziaWG's addKey response) apply them to this same
+    // connection attempt instead of only the next one.
+    val obfuscation: WireGuardObfuscation? = null,
 ) {
     override fun toString(): String = "WireGuardAuthConfiguration"
 }

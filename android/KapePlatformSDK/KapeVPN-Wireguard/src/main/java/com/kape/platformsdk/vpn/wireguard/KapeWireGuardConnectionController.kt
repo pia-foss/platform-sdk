@@ -93,6 +93,7 @@ class KapeWireGuardConnectionController(
                     // Pre-seeded DNS (custom DNS / Advanced Protection) wins over the auth response.
                     dnsServers = configuration.dnsServers.ifEmpty { authConfig.dnsServers },
                     gatewayIp = configuration.gatewayIp ?: authConfig.gatewayIp,
+                    obfuscation = authConfig.obfuscation ?: configuration.obfuscation,
                 )
             val dnsServers = authenticated.resolvedDnsServers
             if (dnsServers.isEmpty()) {
