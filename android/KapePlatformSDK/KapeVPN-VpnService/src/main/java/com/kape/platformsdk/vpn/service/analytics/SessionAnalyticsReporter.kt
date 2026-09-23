@@ -33,6 +33,7 @@ class SessionAnalyticsReporter(
     private val dispatcher: CoroutineDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher(),
     private val selectedProtocol: String = "automatic",
     private val selectedLocationDescription: String? = null,
+    private val connectSource: KapeConnectSource = KapeConnectSource.Manual,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val lock = Any()
@@ -54,7 +55,7 @@ class SessionAnalyticsReporter(
                 currentSessionId = sessionId
                 sessionStartedAtMs = System.currentTimeMillis()
                 hasEverConnected = false
-                SessionBeginEvent(sessionId, selectedProtocol, selectedLocationDescription)
+                SessionBeginEvent(sessionId, connectSource, selectedProtocol, selectedLocationDescription)
             }
         dispatch(event) { a, e -> a.sessionDidBegin(e) }
     }
@@ -69,6 +70,7 @@ class SessionAnalyticsReporter(
                 sessionStartedAtMs = null
                 SessionEndEvent(
                     sessionId = sessionId,
+                    connectSource = connectSource,
                     wasEverConnected = wasEverConnected,
                     reason = reason,
                     durationMs = System.currentTimeMillis() - startedAt,

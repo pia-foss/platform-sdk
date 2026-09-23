@@ -21,4 +21,7 @@ sealed class DisconnectReason {
 
     /** `pause()` was called. */
     object Paused : DisconnectReason()
+
+    /** A Connect on Demand rule with a disconnect action matched. */
+    object OnDemandRule : DisconnectReason()
 }

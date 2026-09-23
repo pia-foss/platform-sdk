@@ -5,6 +5,8 @@ import java.util.UUID
 
 data class SessionBeginEvent(
     val sessionId: UUID,
+    // What started this session — a user action, a Connect on Demand rule, or connect-on-startup.
+    val connectSource: KapeConnectSource,
     // The user's protocol preference (e.g. "automatic", "wireguard") — not which protocol ends
     // up connected (see ConnectionEndEvent.effectiveProtocol).
     val selectedProtocol: String,
@@ -13,6 +15,7 @@ data class SessionBeginEvent(
 
 data class SessionEndEvent(
     val sessionId: UUID,
+    val connectSource: KapeConnectSource,
     val wasEverConnected: Boolean,
     val reason: DisconnectReason,
     val durationMs: Long,
