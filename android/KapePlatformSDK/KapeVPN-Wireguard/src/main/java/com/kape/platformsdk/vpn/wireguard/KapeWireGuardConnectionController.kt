@@ -172,6 +172,7 @@ class KapeWireGuardConnectionController(
             if (handshakeResult == null) {
                 wireguardClient.turnOff(currentHandle)
                 wireguardClient.resetLogger()
+                handle = null
                 logger.error("Handshake timed out after ${HANDSHAKE_TIMEOUT_MS}ms")
             } else {
                 // Connection has been successful
@@ -183,12 +184,14 @@ class KapeWireGuardConnectionController(
                 wireguardClient.turnOff(it)
                 wireguardClient.resetLogger()
             }
+            handle = null
             throw e
         } catch (e: Exception) {
             handle?.let {
                 wireguardClient.turnOff(it)
                 wireguardClient.resetLogger()
             }
+            handle = null
             logger.error("connect() failed: ${e::class.simpleName}")
             false
         }
@@ -256,10 +259,12 @@ class KapeWireGuardConnectionController(
                         setJunkPacketCount(amnezia.junkPacketCount.toInt())
                         setJunkPacketMinSize(amnezia.junkPacketMinSize.toInt())
                         setJunkPacketMaxSize(amnezia.junkPacketMaxSize.toInt())
-                        setInitPacketMagicHeader(amnezia.initPacketMagicHeader)
-                        setResponsePacketMagicHeader(amnezia.responsePacketMagicHeader)
-                        setUnderloadPacketMagicHeader(amnezia.underloadPacketMagicHeader)
-                        setTransportPacketMagicHeader(amnezia.transportPacketMagicHeader)
+                        // Magic headers take a String since AmneziaWG 0.3.3 — stored verbatim, so
+                        // the decimal rendering is the same value the Long overload wrote before.
+                        setInitPacketMagicHeader(amnezia.initPacketMagicHeader.toString())
+                        setResponsePacketMagicHeader(amnezia.responsePacketMagicHeader.toString())
+                        setUnderloadPacketMagicHeader(amnezia.underloadPacketMagicHeader.toString())
+                        setTransportPacketMagicHeader(amnezia.transportPacketMagicHeader.toString())
                     }
                 }.build()
 

@@ -3,6 +3,7 @@ package com.kape.platformsdk.vpn.service
 import com.kape.platformsdk.vpn.service.analytics.AttemptResult
 import com.kape.platformsdk.vpn.service.analytics.ConnectReason
 import com.kape.platformsdk.vpn.service.analytics.DisconnectReason
+import com.kape.platformsdk.vpn.service.analytics.KapeConnectSource
 import com.kape.platformsdk.vpn.service.analytics.NoOpVpnConnectionAnalytics
 import com.kape.platformsdk.vpn.service.analytics.SessionAnalyticsReporter
 import com.kape.platformsdk.vpn.service.analytics.VpnConnectionAnalytics
@@ -64,6 +65,7 @@ class KapeSessionController(
     private val runLoopScope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatcher),
     selectedProtocol: String = "automatic",
     selectedLocationDescription: String? = null,
+    connectSource: KapeConnectSource = KapeConnectSource.Manual,
     // Wait applied between configuration-generator retries after an empty batch (see
     // VpnConfigurationGenerator.configurations()).
     private val generatorRetryBackoff: GeneratorRetryBackoff = DefaultGeneratorRetryBackoff,
@@ -73,7 +75,14 @@ class KapeSessionController(
     val state = VpnServiceState()
 
     private val reporter =
-        SessionAnalyticsReporter(analytics, logger, analyticsDispatcher, selectedProtocol, selectedLocationDescription)
+        SessionAnalyticsReporter(
+            analytics,
+            logger,
+            analyticsDispatcher,
+            selectedProtocol,
+            selectedLocationDescription,
+            connectSource,
+        )
 
     // Guards reportConnectionRestart() — failed attempts after a drop should open one
     // replacement connection, not one per attempt. Cleared on the next successful attempt.
@@ -276,6 +285,7 @@ class KapeSessionController(
                     } finally {
                         withContext(NonCancellable) {
                             activeController = null
+                            state.trafficStats.update { KapeVpnTrafficStats.ZERO }
                             typedController.stop()
                         }
                     }

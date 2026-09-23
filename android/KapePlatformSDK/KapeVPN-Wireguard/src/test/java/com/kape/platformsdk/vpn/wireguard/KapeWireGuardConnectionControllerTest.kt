@@ -394,6 +394,25 @@ class KapeWireGuardConnectionControllerTest {
             verify { wireguardClient.resetLogger() }
         }
 
+    @Test
+    fun `a failed connect clears the handle so the next connect does not turn off a dead tunnel`() =
+        runTest {
+            val first = launch { controller.connect(fakeConfig) }
+            runCurrent()
+            advanceTimeBy(HANDSHAKE_TIMEOUT_MS + 1)
+            first.join()
+            verify(exactly = 1) { wireguardClient.turnOff(FAKE_HANDLE) }
+
+            val second = launch { controller.connect(fakeConfig) }
+            runCurrent()
+            triggerHandshakeSuccess()
+            runCurrent()
+            second.join()
+
+            // Only the timed-out tunnel was turned off; the retry found no stale handle.
+            verify(exactly = 1) { wireguardClient.turnOff(FAKE_HANDLE) }
+        }
+
     // ── helpers ────────────────────────────────────────────────────────────────
 
     private fun triggerHandshakeSuccess() = loggerSlot.captured.onNewLog(0, "wg", HANDSHAKE_SUCCESS_LOG)

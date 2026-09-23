@@ -9,6 +9,7 @@ import com.kape.platformsdk.vpn.service.interfaces.GeneratorRetryBackoff
 import com.kape.platformsdk.vpn.service.interfaces.NetworkConnectivityMonitor
 import com.kape.platformsdk.vpn.service.interfaces.VpnConfiguration
 import com.kape.platformsdk.vpn.service.interfaces.VpnConfigurationGenerator
+import com.kape.platformsdk.vpn.service.models.KapeNetworkState
 import com.kape.platformsdk.vpn.service.models.KapeVPNConnectionStatus
 import com.kape.platformsdk.vpn.service.models.KapeVpnTrafficStats
 import com.kape.platformsdk.vpn.service.models.KapeVpnTunnelError
@@ -575,6 +576,41 @@ class KapeSessionControllerTest {
         }
 
     @Test
+    fun `trafficStats resets to ZERO when a connection drops before the reconnect`() =
+        runTest {
+            val mockController = mockk<ConnectionController<TestVpnConfiguration>>()
+            coEvery { mockController.configurationClass } returns TestVpnConfiguration::class
+            coEvery { mockController.connect(any()) } returns true
+            every { mockController.getTrafficStats() } returns KapeVpnTrafficStats(bytesReceived = 100, bytesSent = 200)
+            val currentDeferred = AtomicReference<CompletableDeferred<Throwable?>?>(null)
+            coEvery { mockController.runVPN() } coAnswers {
+                val deferred = CompletableDeferred<Throwable?>()
+                currentDeferred.set(deferred)
+                deferred.await()
+            }
+            coEvery { mockController.stop() } coAnswers { currentDeferred.get()?.complete(null) }
+
+            val controller =
+                KapeSessionController(
+                    configurationGenerator = VpnConfigurationGenerator { listOf(TestVpnConfiguration()) },
+                    connectionControllers = listOf(mockController),
+                    systemTunnel = fakeSystemTunnel(),
+                    dispatcher = UnconfinedTestDispatcher(testScheduler),
+                )
+
+            controller.start()
+            advanceTimeBy(1_001)
+            assertEquals(KapeVpnTrafficStats(bytesReceived = 100, bytesSent = 200), controller.state.trafficStats.value)
+
+            // The dropped connection's counters must not survive into the reconnected session;
+            // the poll only refreshes them after the next interval.
+            controller.forceReconnect()
+
+            assertEquals(KapeVpnTrafficStats.ZERO, controller.state.trafficStats.value)
+            controller.stop()
+        }
+
+    @Test
     fun `trafficStats resets to ZERO when the session stops`() =
         runTest {
             val mockController = mockk<ConnectionController<TestVpnConfiguration>>()
@@ -842,6 +878,8 @@ private class FakeNetworkConnectivityMonitor(
     private val onlineFlow = MutableStateFlow(online)
 
     override val isOnline: Boolean get() = onlineFlow.value
+
+    override val networkState = MutableStateFlow(KapeNetworkState.OFFLINE)
 
     override suspend fun awaitConnectivity() {
         onlineFlow.first { it }

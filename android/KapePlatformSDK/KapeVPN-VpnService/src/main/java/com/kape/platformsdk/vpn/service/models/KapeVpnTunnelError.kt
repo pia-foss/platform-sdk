@@ -29,4 +29,13 @@ enum class KapeVpnTunnelError {
 
     /** A Dedicated IP connection was attempted on a protocol other than Lightway. */
     DipUnsupportedProtocol,
+
+    /** The SDK license does not grant Dedicated IP. */
+    DipNotEntitled,
+
+    /**
+     * Every endpoint for this location was excluded by the SDK license — its protocols, or its
+     * obfuscation, are not granted. Distinct from a location that serves no endpoints at all.
+     */
+    EndpointsExcludedByLicense,
 }
