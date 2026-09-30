@@ -10,6 +10,7 @@ import com.kape.platformsdk.vpn.service.interfaces.ConnectionAttemptReporting
 import com.kape.platformsdk.vpn.service.interfaces.ConnectionController
 import com.kape.platformsdk.vpn.service.models.IpAddress
 import com.kape.platformsdk.vpn.service.models.KapeVpnTrafficStats
+import com.kape.platformsdk.vpn.service.redactPublicIps
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
@@ -82,7 +83,15 @@ class KapeWireGuardConnectionController(
 
         return try {
             logger.debug("Authenticating — endpoint=${configuration.host}:${configuration.port}")
-            val authConfig = authenticator.authenticate(configuration.endpointConfiguration)
+            val authConfig =
+                try {
+                    authenticator.authenticate(configuration.endpointConfiguration)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    logger.error(e.toAuthFailureLog())
+                    throw e
+                }
             logger.debug("Authentication succeeded — starting WireGuard tunnel")
             val authenticated =
                 configuration.copy(
@@ -305,6 +314,14 @@ class KapeWireGuardConnectionController(
         return builder.establish()?.detachFd()
             ?: throw WireGuardConnectionError.TunnelEstablishFailed()
     }
+}
+
+// The host-app logger may not redact, and an authenticator's message typically embeds the auth
+// server's public IP — strip that, but keep private IPs and the rest of the message for diagnosis.
+internal fun Exception.toAuthFailureLog(): String {
+    val status = (this as? WireGuardAuthenticationException)?.httpStatus?.toString() ?: "n/a"
+    val detail = message?.redactPublicIps() ?: "no message"
+    return "Authentication failed: ${this::class.simpleName} httpStatus=$status message=$detail"
 }
 
 sealed class WireGuardConnectionError : Exception() {
