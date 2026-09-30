@@ -3,6 +3,7 @@ package com.kape.platformsdk.vpn.wireguard
 import android.os.ParcelFileDescriptor
 import com.kape.platformsdk.vpn.service.KapeSystemTunnel
 import com.kape.platformsdk.vpn.service.KapeTunnelBuilder
+import com.kape.platformsdk.vpn.service.VpnServiceLogger
 import com.kape.platformsdk.vpn.service.models.IpAddress
 import com.kape.platformsdk.vpn.service.models.KapeVpnTrafficStats
 import io.mockk.CapturingSlot
@@ -78,6 +79,51 @@ class KapeWireGuardConnectionControllerTest {
     }
 
     // ── connect() ──────────────────────────────────────────────────────────────
+
+    @Test
+    fun `auth failure logs the HTTP status and message with only public IPs redacted`() =
+        runTest {
+            val logger = mockk<VpnServiceLogger>(relaxed = true)
+            coEvery { authenticator.authenticate(any()) } throws
+                WireGuardAuthenticationException(
+                    message = "addKey request to 212.102.49.1 failed with status 401 Unauthorized (gateway 10.0.0.1)",
+                    httpStatus = 401,
+                )
+            val loggingController =
+                KapeWireGuardConnectionController(
+                    systemTunnel = systemTunnel,
+                    authenticator = authenticator,
+                    logger = logger,
+                    wireguardClient = wireguardClient,
+                )
+
+            assertFalse(loggingController.connect(fakeConfig))
+
+            verify {
+                logger.error(
+                    "Authentication failed: WireGuardAuthenticationException httpStatus=401 " +
+                        "message=addKey request to <redacted> failed with status 401 Unauthorized (gateway 10.0.0.1)",
+                )
+            }
+        }
+
+    @Test
+    fun `auth failure without an HTTP status still logs the message`() =
+        runTest {
+            val logger = mockk<VpnServiceLogger>(relaxed = true)
+            coEvery { authenticator.authenticate(any()) } throws IllegalStateException("timeout")
+            val loggingController =
+                KapeWireGuardConnectionController(
+                    systemTunnel = systemTunnel,
+                    authenticator = authenticator,
+                    logger = logger,
+                    wireguardClient = wireguardClient,
+                )
+
+            assertFalse(loggingController.connect(fakeConfig))
+
+            verify { logger.error("Authentication failed: IllegalStateException httpStatus=n/a message=timeout") }
+        }
 
     @Test
     fun `authenticate is called on connect`() =
