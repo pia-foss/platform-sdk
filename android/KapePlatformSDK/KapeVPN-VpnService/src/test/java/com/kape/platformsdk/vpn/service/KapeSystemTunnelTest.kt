@@ -207,6 +207,44 @@ class KapeSystemTunnelTest {
         }
 
     @Test
+    fun `openNetworkLockTunnel retries without the IPv6 address when establish throws`() =
+        runTest {
+            val established = fakePfd()
+            every { anyConstructed<VpnService.Builder>().establish() } throws
+                IllegalStateException("Cannot set address") andThen established
+
+            val result = systemTunnel.openNetworkLockTunnel()
+
+            assertTrue(result)
+            verify(exactly = 2) { anyConstructed<VpnService.Builder>().establish() }
+            verify(exactly = 1) { anyConstructed<VpnService.Builder>().addAddress(LIGHTWAY_LOCAL_IPV6, 128) }
+            verify(exactly = 2) { anyConstructed<VpnService.Builder>().addAddress(LIGHTWAY_LOCAL_IP, 32) }
+        }
+
+    @Test
+    fun `openNetworkLockTunnel keeps the IPv6 route on the IPv4-only retry`() =
+        runTest {
+            val established = fakePfd()
+            every { anyConstructed<VpnService.Builder>().establish() } throws
+                IllegalStateException("Cannot set address") andThen established
+
+            systemTunnel.openNetworkLockTunnel()
+
+            verify(exactly = 2) { anyConstructed<VpnService.Builder>().addRoute("::", 0) }
+        }
+
+    @Test
+    fun `openNetworkLockTunnel returns false when the IPv4-only retry also fails`() =
+        runTest {
+            every { anyConstructed<VpnService.Builder>().establish() } throws IllegalStateException("Cannot set address")
+
+            val result = systemTunnel.openNetworkLockTunnel()
+
+            assertFalse(result)
+            verify(exactly = 2) { anyConstructed<VpnService.Builder>().establish() }
+        }
+
+    @Test
     fun `a Lightway-shaped connect after openNetworkLockTunnel reuses the same tunnel`() =
         runTest {
             val established = fakePfd()

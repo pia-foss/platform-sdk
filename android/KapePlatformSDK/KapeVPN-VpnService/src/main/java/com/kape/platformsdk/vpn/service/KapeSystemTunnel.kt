@@ -56,29 +56,16 @@ class KapeSystemTunnel(
             return true
         }
 
-        val builder =
-            newBuilder()
-                .setSession(NETWORK_LOCK_SESSION_NAME)
-                .addAddress(LIGHTWAY_LOCAL_IP, 32)
-                .addRoute("0.0.0.0", 0)
-                .addAddress(LIGHTWAY_LOCAL_IPV6, 128)
-                .addRoute("::", 0)
-                .apply {
-                    customDnsServers.normalizedDnsServers().ifEmpty { listOf(LIGHTWAY_DNS_IP) }.forEach { addDnsServer(it) }
-                }.setMtu(LIGHTWAY_MTU)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            builder.setMetered(false)
-        }
-
+        // Some Android TV boxes and custom ROMs disable IPv6 on new interfaces, so the kernel
+        // rejects the IPv6 address and establish() throws. Retry without it: the "::/0" route alone
+        // still captures IPv6 traffic — the same shape WireGuard/OpenVPN tunnels use. That tunnel
+        // no longer matches Lightway's settings, so a Lightway connect establishes for real.
         val pfd =
-            try {
-                builder.establish()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                logger.error("[tunnel] openNetworkLockTunnel establish() threw: ${e::class.simpleName}")
-                null
-            }
+            establishNetworkLock(includeIpv6Address = true)
+                ?: run {
+                    logger.warning("[tunnel] retrying network lock tunnel without the IPv6 address")
+                    establishNetworkLock(includeIpv6Address = false)
+                }
         if (pfd == null) {
             logger.error("[tunnel] openNetworkLockTunnel establish() returned null")
             return false
@@ -89,6 +76,31 @@ class KapeSystemTunnel(
         // registration alive even after closeCurrentTunnel() later closes the retained master).
         runCatching { pfd.close() }
         return true
+    }
+
+    private suspend fun establishNetworkLock(includeIpv6Address: Boolean): ParcelFileDescriptor? {
+        val builder =
+            newBuilder()
+                .setSession(NETWORK_LOCK_SESSION_NAME)
+                .addAddress(LIGHTWAY_LOCAL_IP, 32)
+                .addRoute("0.0.0.0", 0)
+                .apply { if (includeIpv6Address) addAddress(LIGHTWAY_LOCAL_IPV6, 128) }
+                .addRoute("::", 0)
+                .apply {
+                    customDnsServers.normalizedDnsServers().ifEmpty { listOf(LIGHTWAY_DNS_IP) }.forEach { addDnsServer(it) }
+                }.setMtu(LIGHTWAY_MTU)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            builder.setMetered(false)
+        }
+
+        return try {
+            builder.establish()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logger.error("[tunnel] openNetworkLockTunnel establish() threw: ${e::class.simpleName}")
+            null
+        }
     }
 
     fun protect(socket: Int): Boolean = vpnService.protect(socket)
